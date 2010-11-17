@@ -43,7 +43,7 @@ offsetToChar :: Word32 -> Char
 offsetToChar offset = chr (fromIntegral offset + (ord '0'))
 
 -- | Convert a character to an offset 'Word32'.
-charToOffset :: Char -> Word32
+charToOffset      :: Char -> Word32
 charToOffset char = fromIntegral $ (ord char) - (ord '0')
 
 ----------------------------------------------------------------------------------------------
@@ -136,8 +136,8 @@ scour seq = case measure seq of
 
 -- | Convert a text3 into a text1
 stringify :: L.Text -> L.Text
-stringify txt = case L.uncons txt of
-                  Just (head, tail) -> L.cons head (drop2 tail)
-                  Nothing           -> L.empty
+stringify txt   = case L.uncons txt of
+                    Just (head, tail) -> L.cons head (drop2 tail)
+                    Nothing           -> L.empty
     where drop2 = drop1     . L.tail
           drop1 = stringify . L.tail

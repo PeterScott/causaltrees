@@ -69,7 +69,10 @@ instance Monoid PartialScour where
     (PS d1 s1 nc1) `mappend` (PS d2 s2 nc2) =
         PS d1 (s1 `mappend` (nc1 d2) `mappend` s2) nc2
 
-partiallyScour a@(Atom5c '⌫' (pc, po) (idc, ido)) = PS (Just (pc, po)) mempty (\_ -> mempty)
+partiallyScour a@(Atom5c '⌫' (pc, po) _) = PS (Just (pc, po)) mempty (\_ -> mempty)
+partiallyScour a@(Atom5c '\2384' _ _)     = PS Nothing         mempty (\_ -> mempty)
+partiallyScour a@(Atom5c '\1757' _ _)     = PS Nothing         mempty (\_ -> mempty)
+partiallyScour a@(Atom5c '\8960' _ _)     = PS Nothing         mempty (\_ -> mempty)
 partiallyScour a = PS Nothing mempty (deleteMaybe a)
 
 -- | Turn a partial scour into a complete stringified text3.

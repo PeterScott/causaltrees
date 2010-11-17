@@ -98,8 +98,6 @@ instance Measured FWMeasure Atom5c where
 
 type FingerWeave = FingerTree FWMeasure Atom5c
 
---foo = fromList [hatom, hdatom] :: FingerWeave
-
 -- Example weave
 sc_weave_txt = L.pack "\2384\&0101T01a1ea1a2xa2b2sa2a3\9003a3b1ta3a4\1757\&0102\8960b2a5"
 sc_weave = weave5cToFingerWeave sc_weave_txt

@@ -9,7 +9,7 @@ module Weft (
             , WeftUArray
             ) where
 
-import qualified Data.Map as Map
+import qualified Data.IntMap as IntMap
 import Data.Word
 import Data.Char
 import Data.Maybe
@@ -41,15 +41,15 @@ class Weft a where
 -- | A map-based implementation of a 'Weft'. This may share memory
 --   with other, closely related wefts, and has O(lg n) time
 --   complexity for most everything.
-newtype WeftMap = WeftMap (Map.Map Char Word32)
+newtype WeftMap = WeftMap (IntMap.IntMap Word32)
     deriving (Eq, Show)
 
 instance Weft WeftMap where
-    emptyWeft                       = WeftMap Map.empty
-    getWeft (WeftMap m) yarn        = case Map.lookup yarn m of
+    emptyWeft                       = WeftMap IntMap.empty
+    getWeft (WeftMap m) yarn        = case IntMap.lookup (fromIntegral $ ord yarn) m of
                                         Just offset -> offset
                                         Nothing     -> 0
-    setWeft (WeftMap m) yarn offset = WeftMap $ Map.insert yarn offset m
+    setWeft (WeftMap m) yarn offset = WeftMap $ IntMap.insert (fromIntegral $ ord yarn) offset m
 
 -- | An unboxed array-based implementation of a 'Weft'. This is the
 --   most compact way to represent a single weft, assuming that no

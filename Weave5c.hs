@@ -15,8 +15,8 @@ import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Builder as TLB
 
 -- | Atoms consist of a character, a predecessor id, and an atom id.
-data Atom5c = Atom5c { c :: Char, atom_pred :: (Char, Word32), atom_id :: (Char, Word32) }
-            deriving (Show, Eq)
+data Atom5c = Atom5c Char (Char, Word32) (Char, Word32)
+              deriving (Show, Eq)
 
 -- | Convert an 'Atom5c' to a 'Text' of length 5.
 atomToText5 :: Atom5c -> L.Text
@@ -80,7 +80,7 @@ completeScour :: PartialScour -> L.Text
 completeScour PSNull      = L.empty
 completeScour (PS _ s nc) = TLB.toLazyText $ s `mappend` (nc Nothing)
 
-hatom  = (Atom5c { c = 'H', atom_pred = ('0', 1), atom_id = ('a', 1) })
+hatom  = (Atom5c 'H' ('0', 1) ('a', 1))
 hdatom = (Atom5c '⌫' ('a', 1) ('b', 1))
 
 ----------------------------------------------------------------------------------------------

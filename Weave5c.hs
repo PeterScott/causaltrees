@@ -13,6 +13,9 @@ import Data.Char
 import Data.Maybe
 import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Builder as TLB
+import Data.List (foldl')
+
+import Weft
 
 -- | Atoms consist of a character, a predecessor id, and an atom id.
 data Atom5c = Atom5c Char (Char, Word32) (Char, Word32)
@@ -142,3 +145,83 @@ stringify txt   = case L.uncons txt of
                     Nothing           -> L.empty
     where drop2 = drop1     . L.tail
           drop1 = stringify . L.tail
+
+----------------------------------------------------------------------------------------------
+
+-- FIXME: make data structure mapping (yarn, offset) pairs to
+-- wefts. Idea: use an IntMap from yarns to a finger tree structure
+-- which supports fast append and find-lte-offset operations. This
+-- shall be called a Quipu, made up of QuipuStrings.
+
+-- | A 'QuipuString' is a data structure which stores (offset, weft)
+--   pairs for a single yarn. It is meant to support two operations
+--   efficiently:
+-- 
+--   * Add a new weft with a higher offset than any yet stored. O(1).
+-- 
+--   * Find the highest-offset weft with an offset less than or equal
+--     to a given offset. O(lg n).
+-- 
+--   In order to efficiently support these operations, we use a finger
+--   tree data structure. It measures the offsets, and the monoid
+--   operation returns the maximum of the offsets it compares.
+newtype (Weft a) => QuipuString a = QuipuString (FingerTree MaxOffsetMeasure (Word32, a))
+    deriving (Eq, Show)
+
+-- Max offset measure: computes the maximum offset in a given range.
+newtype MaxOffsetMeasure = MaxOffsetMeasure Word32
+
+instance Monoid MaxOffsetMeasure where
+    mempty = MaxOffsetMeasure 0
+    (MaxOffsetMeasure x) `mappend` (MaxOffsetMeasure y) = MaxOffsetMeasure $ max x y
+
+instance (Weft a) => Measured MaxOffsetMeasure (Word32, a) where
+    measure = MaxOffsetMeasure . fst
+
+-------------------------
+-- The QuipuString API --
+-------------------------
+
+-- | Add an (offset, weft) pair to the end of a 'QuipuString'. The
+--   offset must be higher than any previous offset in the
+--   'QuipuString', or the result is undefined and will probably be
+--   absolutely disastrous. Takes O(1) time.
+quipuStringAdd :: (Weft a) => QuipuString a -> (Word32, a) -> QuipuString a
+quipuStringAdd (QuipuString ft) pair = QuipuString $ ft |> pair
+
+-- | Find the highest-offset weft with an offset less than or equal to
+--   the given offset. If there is none, which should never happen, it
+--   will return the weft with the lowest offset in the
+--   'QuipuString'. If the 'QuipuString' is empty, which also should
+--   never happen, it will return an empty weft located at offset 0,
+--   which has no real semantic meaning but should be relatively
+--   safe. Takes O(lg n) time.
+quipuStringFindLte :: (Weft a) => QuipuString a -> Word32 -> (Word32, a)
+quipuStringFindLte (QuipuString ft) offset =
+    case viewr left of
+      -- This case should never happen, but we deal with it anyway.
+      EmptyR -> case viewl ft of
+                  EmptyL -> (0, emptyWeft) -- This should also never happen.
+                  x :< _ -> x
+      _ :> x -> x
+    where (left, _) = split (\(MaxOffsetMeasure o) -> o > offset) ft
+
+-- | Create a 'QuipuString' from a list of (offset, weft) pairs,
+--   ordered by offset. Takes O(n) time.
+quipuStringFromList :: (Weft a) => [(Word32, a)] -> QuipuString a
+quipuStringFromList =  QuipuString . fromList
+
+-- -- Some data for debugging
+-- w1 = weft2ToWeft $ L.pack "a2b4" :: WeftMap
+-- w2 = weft2ToWeft $ L.pack "a3b4" :: WeftMap
+-- w3 = weft2ToWeft $ L.pack "a3b5" :: WeftMap
+-- w4 = weft2ToWeft $ L.pack "a6b8" :: WeftMap
+-- off1 = 2
+-- off2 = 7
+-- off3 = 8
+-- off4 = 20
+
+-- emptyqs :: QuipuString WeftMap
+-- emptyqs = QuipuString empty
+-- fullqs  = foldl' quipuStringAdd emptyqs [(off1, w1), (off2, w2), (off3, w3), (off4, w4)]
+-- fullqs' = quipuStringFromList [(off1, w1), (off2, w2), (off3, w3), (off4, w4)]

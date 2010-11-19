@@ -14,6 +14,7 @@ import Data.Maybe
 import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Builder as TLB
 import Data.List (foldl')
+import qualified Data.IntMap as IntMap
 
 import Weft
 
@@ -220,8 +221,59 @@ quipuStringFromList =  QuipuString . fromList
 -- off2 = 7
 -- off3 = 8
 -- off4 = 20
-
+-- 
 -- emptyqs :: QuipuString WeftMap
 -- emptyqs = QuipuString empty
 -- fullqs  = foldl' quipuStringAdd emptyqs [(off1, w1), (off2, w2), (off3, w3), (off4, w4)]
 -- fullqs' = quipuStringFromList [(off1, w1), (off2, w2), (off3, w3), (off4, w4)]
+-- partqs  = quipuStringFromList [(off1, w1), (off3, w3)]
+
+-- | A map from (yarn, offset) pairs to the highest-offset weft in
+--   that yarn with an offset less than the given offset. These
+--   lookups take O(lg n) time. It's implemented internally as an
+--   'IntMap' of 'QuipuString' finger-tree-based data structures.
+newtype (Weft a) => Quipu a = Quipu (IntMap.IntMap (QuipuString a))
+    deriving (Eq, Show)
+
+yarnToInt :: Char -> Int
+yarnToInt = fromIntegral . ord
+
+-- | An empty 'Quipu'.
+quipuEmpty :: (Weft a) => Quipu a
+quipuEmpty = Quipu IntMap.empty
+
+-- | Look up an entry in a 'Quipu' corresponding to the given
+--   offset. If no such entry is found, which should never happen, it
+--   will return an empty weft with offset 0. Takes O(lg n) time.
+quipuLookup :: (Weft a) => Quipu a -> (Char, Word32) -> (Word32, a)
+quipuLookup (Quipu m) (yarn, offset) =
+    case IntMap.lookup (yarnToInt yarn) m of
+      Just qs -> quipuStringFindLte qs offset
+      Nothing -> (0, emptyWeft)
+
+-- | Add a 'QuipuString' to a 'Quipu' with a given yarn. Any existing
+--   'QuipuString' with that yarn will be replaced. This is not likely
+--   to be very useful to end users, but it might be, so we're making
+--   it part of the API anyway.
+quipuAddString :: (Weft a) => Quipu a -> Char -> QuipuString a -> Quipu a
+quipuAddString (Quipu m) yarn qs = Quipu $ IntMap.insert (yarnToInt yarn) qs m
+
+-- | Add a (yarn, offset) to 'Weft' mapping to the given 'Quipu', and
+--   return the new 'Quipu' produced by this. The offset must be
+--   larger than any other offset in the given yarn, or quiet and
+--   hard-to-debug calamity will result. Takes O(1) time. If you
+--   attempt to add to an empty yarn, the offset must be 1, or there
+--   will be an error.
+quipuAdd :: (Weft a) => Quipu a -> (Char, Word32) -> a -> Quipu a
+quipuAdd (Quipu m) (yarn, offset) weft =
+    case IntMap.lookup yarnInt m of
+      Just qs -> Quipu $ IntMap.insert yarnInt (qs `quipuStringAdd` (offset, weft)) m
+      Nothing -> if offset == 1 then
+                     Quipu $ IntMap.insert yarnInt (QuipuString $ fromList [(offset, weft)]) m
+                 else 
+                     error "Offset for first Quipu entry in a yarn must be 1"
+    where yarnInt = yarnToInt yarn
+
+-- -- Some data for debugging
+-- qpu1 :: Quipu WeftMap
+-- qpu1 = quipuAddString (quipuAddString quipuEmpty 'g' fullqs) 's' partqs

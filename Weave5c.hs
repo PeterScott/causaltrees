@@ -135,9 +135,9 @@ prepend' :: Atom5c -> FingerWeave -> FingerWeave
 prepend' = (<|)
 
 -- | Scour a weave5c into a text3. Does not remove special symbols. FIXME: do this.
-scour :: FingerWeave -> L.Text
-scour seq = case measure seq of
-                  FWMeasure _ x _ -> completeScour x
+scour' :: FingerWeave -> L.Text
+scour' seq = case measure seq of
+                   FWMeasure _ x _ -> completeScour x
 
 -- | Convert a text3 into a text1
 stringify :: L.Text -> L.Text
@@ -277,3 +277,18 @@ quipuAdd (Quipu m) (yarn, offset) weft =
 -- -- Some data for debugging
 -- qpu1 :: Quipu WeftMap
 -- qpu1 = quipuAddString (quipuAddString quipuEmpty 'g' fullqs) 's' partqs
+
+----------------------------------------------------------------------------------------------
+
+-- | A 'Weave5c' contains a 'FingerWeave' which has the atom data
+--   itself, a 'Quipu' to store awareness wefts for each atom whose
+--   predecessor is in a different yarn, and a 'WeftUArray' to store
+--   the rightmost weft of the weave.
+data Weave5c = Weave5c FingerWeave (Quipu WeftMap) WeftUArray
+               deriving Show
+
+blank_weave = Weave5c (weave5cToFingerWeave (L.pack "\2384\&0101\1757\&0102")) quipuEmpty emptyWeft
+
+scour :: Weave5c -> L.Text
+scour (Weave5c fw _ _) = scour' fw
+

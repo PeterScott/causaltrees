@@ -4,7 +4,22 @@
 -- Finger Weaves: efficient, purely functional data structure for
 -- representing a weave5c, based on Finger Trees.
 
-module Weave5c where
+module Weave5c {-( 
+                 -- Tools for working with atoms
+                 Atom5c,
+               , atomToText5
+               , atomToText3
+               , text5ToAtom
+               , offsetToChar
+               , charToOffset
+                 -- FIXME: replace these two with functions that
+                 -- manipulate the Weave5c data type.
+               , weave5cToFingerWeave -- FIXME: remove
+               , fingerWeaveToWeave5c -- FIXME: remove
+                 -- 
+               , stringify
+               , 
+               )-} where
 
 import Data.FingerTree
 import Data.Monoid
@@ -52,6 +67,21 @@ charToOffset char = fromIntegral $ (ord char) - (ord '0')
 
 ----------------------------------------------------------------------------------------------
 
+-- | The incremental scouring algorithm consists of building up
+--   partially-scoured parser states. Each one has three parts:
+-- 
+--   * An initial deletor atom, if any.
+--
+--   * A string of atoms which are "settled". That is, they're not
+--     going to be changed regardless of context.
+-- 
+--   * A function that takes a deletor atom (if any) from the next
+--     block of the weave, and returns settled atoms.
+-- 
+--   The settled atoms take the form of a 'TLB.Builder', which allows
+--   lazy concatenation and memory sharing of
+--   substrings. 'PartialScour' is a monoid, and it's used as a
+--   measure for a finger tree.
 data PartialScour = PS (Maybe (Char, Word32)) TLB.Builder (Maybe (Char, Word32) -> TLB.Builder)
                   | PSNull
 
@@ -84,10 +114,11 @@ completeScour :: PartialScour -> L.Text
 completeScour PSNull      = L.empty
 completeScour (PS _ s nc) = TLB.toLazyText $ s `mappend` (nc Nothing)
 
-hatom  = (Atom5c 'H' ('0', 1) ('a', 1))
-hdatom = (Atom5c '⌫' ('a', 1) ('b', 1))
+--hatom  = (Atom5c 'H' ('0', 1) ('a', 1))
+--hdatom = (Atom5c '⌫' ('a', 1) ('b', 1))
 
 ----------------------------------------------------------------------------------------------
+
 
 data FWMeasure = FWMeasure Int PartialScour TLB.Builder
             deriving Show
@@ -117,6 +148,10 @@ fingerWeaveToWeave5c seq = case measure seq of
 
 gtFWMeasure :: Int -> FWMeasure -> Bool
 gtFWMeasure n (FWMeasure x _ _) = x > n
+
+-- FIXME: these finger weave manipulations should not be
+-- exported. Instead, we should give functions for manipulating the
+-- 'Weave5c' data type.
 
 nth' :: FingerWeave -> Int -> Atom5c
 nth' seq n = case viewl right of
@@ -148,11 +183,6 @@ stringify txt   = case L.uncons txt of
           drop1 = stringify . L.tail
 
 ----------------------------------------------------------------------------------------------
-
--- FIXME: make data structure mapping (yarn, offset) pairs to
--- wefts. Idea: use an IntMap from yarns to a finger tree structure
--- which supports fast append and find-lte-offset operations. This
--- shall be called a Quipu, made up of QuipuStrings.
 
 -- | A 'QuipuString' is a data structure which stores (offset, weft)
 --   pairs for a single yarn. It is meant to support two operations

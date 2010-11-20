@@ -1,15 +1,18 @@
 Name:                causaltrees
 Version:             0.0
 Description:         Causal trees for realtime multi-user document editing
+Homepage:            https://github.com/PeterScott/causaltrees
 License:             MIT
+License-file:        LICENSE
 Author:              Peter Scott
 Maintainer:          pjscott@iastate.edu
-Build-Type:          Simple
-Cabal-Version:       >=1.2
+Category:            Text
+Build-type:          Simple
+Extra-source-files:  README.md
+Cabal-version:       >=1.2
 
 Library
   Build-Depends:     base >= 3 && < 5, text >= 0.10.0.0, fingertree >= 0.0.1.0,
                      array >= 0.3.0.1, containers >= 0.3.0.0
   Exposed-modules:   Text.CausalTree, Text.CausalTree.Weft, Text.CausalTree.Weave5c
   ghc-options:       -Wall
-

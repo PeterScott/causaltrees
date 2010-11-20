@@ -1,10 +1,9 @@
 module Text.CausalTree.Weft (
-              Weft
-            , emptyWeft
-            , getWeft
-            , setWeft
-            , extendWeft
-            , weftToList
+              Weft (emptyWeft
+                   , getWeft
+                   , setWeft
+                   , extendWeft
+                   , weftToList)
 
             , weft2ToWeft
             , weftToWeft2
@@ -120,14 +119,14 @@ insArray a (yarnNum, offset) idx = foo
 
 ----------------------------------------------------------------------------------------------
 
--- | Convert a weft2, such as "a5b3d1", to a 'Weft'. Not particularly
+-- | Convert a weft2, such as @\"a5b3d1\"@, to a 'Weft'. Not particularly
 --   efficient, as it may reallocate a lot of arrays. The input weft2
 --   need not be in sorted order.
 weft2ToWeft :: (Weft a) => L.Text -> a
 weft2ToWeft weft2 = listToWeft $ map tuplify $ L.chunksOf 2 weft2
     where tuplify txt = (L.head txt, fromIntegral $ (ord $ L.last txt) - (ord '0'))
 
--- | Convert a 'Weft' into a weft2, such as "a5b3d1". The resulting
+-- | Convert a 'Weft' into a weft2, such as @\"a5b3d1\"@. The resulting
 --   weft2 will be in sorted order.
 weftToWeft2 :: (Weft a) => a -> L.Text
 weftToWeft2 = TLB.toLazyText . (foldl' mappend mempty) . (map toChunk) . weftToList

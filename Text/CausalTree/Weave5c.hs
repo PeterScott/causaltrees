@@ -73,7 +73,7 @@ charToOffset char = fromIntegral $ (ord char) - (ord '0')
 -- 
 --   * An initial deletor atom, if any.
 --
---   * A string of atoms which are "settled". That is, they're not
+--   * A string of atoms which are \"settled\". That is, they're not
 --     going to be changed regardless of context.
 -- 
 --   * A function that takes a deletor atom (if any) from the next

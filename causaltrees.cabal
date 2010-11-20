@@ -3,7 +3,6 @@ Version:             0.0
 Description:         Causal trees for realtime multi-user document editing
 Homepage:            https://github.com/PeterScott/causaltrees
 License:             MIT
-License-file:        LICENSE
 Author:              Peter Scott
 Maintainer:          pjscott@iastate.edu
 Category:            Text

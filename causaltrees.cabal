@@ -14,4 +14,4 @@ Library
   Build-Depends:     base >= 3 && < 5, text >= 0.10.0.0, fingertree >= 0.0.1.0,
                      array >= 0.3.0.1, containers >= 0.3.0.0
   Exposed-modules:   Text.CausalTree, Text.CausalTree.Weft, Text.CausalTree.Weave5c
-  ghc-options:       -Wall
+  ghc-options:       -Wall -O2

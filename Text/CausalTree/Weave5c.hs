@@ -51,11 +51,12 @@ atomToText3 (Atom5c c _ (idc, ido)) =
 text5ToAtom :: L.Text -> Atom5c
 text5ToAtom t 
     | (L.length t == 5) = Atom5c c (pc, charToOffset po) (idc, charToOffset ido)
+    | otherwise         = error "atoms must be of length 5"
     where (c,   t')     = fromJust $ L.uncons t
           (pc,  t'')    = fromJust $ L.uncons t'
           (po,  t''')   = fromJust $ L.uncons t''
           (idc, t'''')  = fromJust $ L.uncons t'''
-          (ido, t''''') = fromJust $ L.uncons t''''
+          (ido, _)      = fromJust $ L.uncons t''''
 
 -- | Convert an offset 'Word32' to a character.
 offsetToChar :: Word32 -> Char
@@ -86,7 +87,8 @@ data PartialScour = PS (Maybe (Char, Word32)) TLB.Builder (Maybe (Char, Word32) 
                   | PSNull
 
 instance Show PartialScour where
-    show (PS d s nc) = "(PS " ++ (show d) ++ " " ++ (show s) ++ " [opaque])"
+    show (PS d s _) = "(PS " ++ (show d) ++ " " ++ (show s) ++ " [opaque])"
+    show PSNull     = "PSNull"
 
 deleteMaybe :: Atom5c -> Maybe (Char, Word32) -> TLB.Builder
 deleteMaybe a Nothing = TLB.fromLazyText $ atomToText3 a
@@ -103,11 +105,12 @@ instance Monoid PartialScour where
     (PS d1 s1 nc1) `mappend` (PS d2 s2 nc2) =
         PS d1 (s1 `mappend` (nc1 d2) `mappend` s2) nc2
 
-partiallyScour a@(Atom5c '⌫' (pc, po) _) = PS (Just (pc, po)) mempty (\_ -> mempty)
-partiallyScour a@(Atom5c '\2384' _ _)     = PS Nothing         mempty (\_ -> mempty)
-partiallyScour a@(Atom5c '\1757' _ _)     = PS Nothing         mempty (\_ -> mempty)
-partiallyScour a@(Atom5c '\8960' _ _)     = PS Nothing         mempty (\_ -> mempty)
-partiallyScour a = PS Nothing mempty (deleteMaybe a)
+partiallyScour                             :: Atom5c -> PartialScour
+partiallyScour (Atom5c '\9003' (pc, po) _) = PS (Just (pc, po)) mempty (\_ -> mempty)
+partiallyScour (Atom5c '\2384' _ _)        = PS Nothing         mempty (\_ -> mempty)
+partiallyScour (Atom5c '\1757' _ _)        = PS Nothing         mempty (\_ -> mempty)
+partiallyScour (Atom5c '\8960' _ _)        = PS Nothing         mempty (\_ -> mempty)
+partiallyScour a                           = PS Nothing mempty (deleteMaybe a)
 
 -- | Turn a partial scour into a complete stringified text3.
 completeScour :: PartialScour -> L.Text
@@ -115,7 +118,7 @@ completeScour PSNull      = L.empty
 completeScour (PS _ s nc) = TLB.toLazyText $ s `mappend` (nc Nothing)
 
 --hatom  = (Atom5c 'H' ('0', 1) ('a', 1))
---hdatom = (Atom5c '⌫' ('a', 1) ('b', 1))
+--hdatom = (Atom5c '\9003' ('a', 1) ('b', 1))
 
 ----------------------------------------------------------------------------------------------
 
@@ -134,8 +137,8 @@ instance Measured FWMeasure Atom5c where
 type FingerWeave = FingerTree FWMeasure Atom5c
 
 -- Example weave
-sc_weave_txt = L.pack "\2384\&0101T01a1ea1a2xa2b2sa2a3\9003a3b1ta3a4\1757\&0102\8960b2a5"
-sc_weave = weave5cToFingerWeave sc_weave_txt
+--sc_weave_txt = L.pack "\2384\&0101T01a1ea1a2xa2b2sa2a3\9003a3b1ta3a4\1757\&0102\8960b2a5"
+--sc_weave = weave5cToFingerWeave sc_weave_txt
 
 -- | Convert a weave5c to a finger weave.
 weave5cToFingerWeave :: L.Text -> FingerWeave
@@ -143,8 +146,8 @@ weave5cToFingerWeave = fromList . map text5ToAtom . L.chunksOf 5
 
 -- | Convert a finger weave to a weave5c.
 fingerWeaveToWeave5c :: FingerWeave -> L.Text
-fingerWeaveToWeave5c seq = case measure seq of
-                             FWMeasure _ _ x -> TLB.toLazyText x
+fingerWeaveToWeave5c fw = case measure fw of
+                            FWMeasure _ _ x -> TLB.toLazyText x
 
 gtFWMeasure :: Int -> FWMeasure -> Bool
 gtFWMeasure n (FWMeasure x _ _) = x > n
@@ -154,14 +157,14 @@ gtFWMeasure n (FWMeasure x _ _) = x > n
 -- 'Weave5c' data type.
 
 nth' :: FingerWeave -> Int -> Atom5c
-nth' seq n = case viewl right of
-               EmptyL -> error "index too large"
-               x :< _ -> x
-    where (_, right) = split (gtFWMeasure n) seq
+nth' fw n = case viewl right of
+              EmptyL -> error "index too large"
+              x :< _ -> x
+    where (_, right) = split (gtFWMeasure n) fw
 
 insert' :: FingerWeave -> Int -> Atom5c -> FingerWeave
-insert' seq n x = left >< (x <| right)
-    where (left, right) = split (gtFWMeasure n) seq
+insert' fw n x = left >< (x <| right)
+    where (left, right) = split (gtFWMeasure n) fw
 
 append' :: FingerWeave -> Atom5c -> FingerWeave
 append' = (|>)
@@ -171,14 +174,14 @@ prepend' = (<|)
 
 -- | Scour a weave5c into a text3. Does not remove special symbols. FIXME: do this.
 scour' :: FingerWeave -> L.Text
-scour' seq = case measure seq of
-                   FWMeasure _ x _ -> completeScour x
+scour' fw = case measure fw of
+              FWMeasure _ x _ -> completeScour x
 
 -- | Convert a text3 into a text1
 stringify :: L.Text -> L.Text
 stringify txt   = case L.uncons txt of
-                    Just (head, tail) -> L.cons head (drop2 tail)
-                    Nothing           -> L.empty
+                    Just (hd, tl) -> L.cons hd (drop2 tl)
+                    Nothing       -> L.empty
     where drop2 = drop1     . L.tail
           drop1 = stringify . L.tail
 
@@ -317,6 +320,7 @@ quipuAdd (Quipu m) (yarn, offset) weft =
 data Weave5c = Weave5c FingerWeave (Quipu WeftMap) WeftUArray
                deriving Show
 
+blank_weave :: Weave5c
 blank_weave = Weave5c (weave5cToFingerWeave (L.pack "\2384\&0101\1757\&0102")) quipuEmpty emptyWeft
 
 scour :: Weave5c -> L.Text

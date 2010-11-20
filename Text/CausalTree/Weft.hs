@@ -16,7 +16,6 @@ module Text.CausalTree.Weft (
 import qualified Data.IntMap as IntMap
 import Data.Word
 import Data.Char
-import Data.Maybe
 import Data.Monoid
 import Data.Array.IArray
 import Data.Array.Unboxed
@@ -89,9 +88,10 @@ instance Weft WeftUArray where
                                               Left  j -> WeftUArray $ insArray a (yarnNum, offset) j
         where yarnNum = fromIntegral $ ord yarn
     weftToList (WeftUArray a) = chunkifyWeftArray $ elems a
-        where chunkifyWeftArray (a : (b : tl)) = (chr $ fromIntegral a, b) : (chunkifyWeftArray tl)
+        where chunkifyWeftArray (x : (y : tl)) = (chr $ fromIntegral x, y) : (chunkifyWeftArray tl)
               chunkifyWeftArray _              = []
 
+bounds' :: UArray Int Word32 -> (Int, Int)
 bounds' a = (l, h `div` 2) where (l, h) = bounds a
 
 -- | Binary search of a weft array 'a' for an element 'x', with bounds

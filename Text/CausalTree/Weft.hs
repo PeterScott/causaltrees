@@ -1,4 +1,4 @@
-module Weft (
+module Text.CausalTree.Weft (
               Weft
             , emptyWeft
             , getWeft
@@ -25,8 +25,6 @@ import Data.Array.ST
 import qualified Data.Text.Lazy as L
 import Data.List (foldl')
 import qualified Data.Text.Lazy.Builder as TLB
-
-import System.IO.Unsafe
 
 -- | A 'Weft' is a mapping of yarns to maximum offsets. It can be
 -- implemented in multiple ways, but all of these implementations use
@@ -95,8 +93,6 @@ instance Weft WeftUArray where
               chunkifyWeftArray _              = []
 
 bounds' a = (l, h `div` 2) where (l, h) = bounds a
-
-trace x = (unsafePerformIO $ print x) `seq` x
 
 -- | Binary search of a weft array 'a' for an element 'x', with bounds
 --   (l, h). Returns an index in 'a', either a Right or a Left.

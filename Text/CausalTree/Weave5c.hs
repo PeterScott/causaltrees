@@ -4,7 +4,7 @@
 -- Finger Weaves: efficient, purely functional data structure for
 -- representing a weave5c, based on Finger Trees.
 
-module Weave5c {-( 
+module Text.CausalTree.Weave5c {-( 
                  -- Tools for working with atoms
                  Atom5c,
                , atomToText5
@@ -31,7 +31,7 @@ import qualified Data.Text.Lazy.Builder as TLB
 import Data.List (foldl')
 import qualified Data.IntMap as IntMap
 
-import Weft
+import Text.CausalTree.Weft
 
 -- | Atoms consist of a character, a predecessor id, and an atom id.
 data Atom5c = Atom5c Char (Char, Word32) (Char, Word32)

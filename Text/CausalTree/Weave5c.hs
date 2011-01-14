@@ -30,6 +30,9 @@ import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Builder as TLB
 import Data.List (foldl')
 import qualified Data.IntMap as IntMap
+import qualified Data.Map as Map
+-- toList converts FingerWeaves to atom lists
+import Data.Foldable (toList)
 
 import Text.CausalTree.Weft
 
@@ -137,8 +140,8 @@ instance Measured FWMeasure Atom5c where
 type FingerWeave = FingerTree FWMeasure Atom5c
 
 -- Example weave
---sc_weave_txt = L.pack "\2384\&0101T01a1ea1a2xa2b2sa2a3\9003a3b1ta3a4\1757\&0102\8960b2a5"
---sc_weave = weave5cToFingerWeave sc_weave_txt
+sc_weave_txt = L.pack "\2384\&0101T01a1ea1a2xa2b2sa2a3\9003a3b1ta3a4\1757\&0102\8960b2a5"
+sc_weave = weave5cToFingerWeave sc_weave_txt
 
 -- | Convert a weave5c to a finger weave.
 weave5cToFingerWeave :: L.Text -> FingerWeave
@@ -326,3 +329,17 @@ blank_weave = Weave5c (weave5cToFingerWeave (L.pack "\2384\&0101\1757\&0102")) q
 scour :: Weave5c -> L.Text
 scour (Weave5c fw _ _) = scour' fw
 
+applyDeletePatch :: L.Text -> Weave5c -> Weave5c
+applyDeletePatch patch weave = Weave5c new_fw qpu new_weft
+    where patch_atoms = map text5ToAtom $ L.chunksOf 5 patch
+          patch_map = Map.fromList [(pred_id, atom) | atom@(Atom5c _ pred_id _) <- patch_atoms]
+          (Weave5c fw qpu weft) = weave
+          add_deletion_atoms [] w = ([], w)
+          add_deletion_atoms ((x@(Atom5c _ _ this_id)):xs) w =
+              case Map.lookup this_id patch_map of
+                Nothing                    -> (x : tl, w') 
+                    where (tl, w') = add_deletion_atoms xs w
+                Just d@(Atom5c _ _ del_id) -> (x : d : tl, w')
+                    where (tl, w') = add_deletion_atoms xs (extendWeft w del_id)
+          (new_fw', new_weft) = add_deletion_atoms (toList fw) weft
+          new_fw = fromList new_fw'

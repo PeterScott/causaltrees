@@ -1,0 +1,21 @@
+* Hacking causaltrees
+  If you want to hack on causaltrees, this file will provide a really
+  unclear summary of what's there and how it works. This is mostly for
+  my own reference.
+
+* Weaves
+  The core of what causaltrees provides is the Weave5c data type. It's
+  made of a FingerWeave (containing the atoms in the document), a
+  Quipu (to store the awareness wefts), and a WeftUArray storing the
+  rightmost weft of the weave. This is the thing that users should end
+  up using. Here are the operations it should provide:
+
+** DONE Make new weave
+** DONE Scour: produce Text from weave
+** TODO Delete one or more atoms.
+   First, make a map from predecessor ids to deletor atoms. Scan
+   through linearly, and any time we encounter an atom in the weave
+   that produces a map hit, we insert the deletion atom into the
+   weave. We can do this by making a weave from a list created by
+   interspersing deletion atoms into the list of the weave. If that
+   made any sense.

@@ -20,7 +20,14 @@ prop_encdec id pred c = decode (encode atom) == atom
     where atom = TextAtom id pred c
 
 -- Top level
-main = sequence_ [ quickCheck prop_compressed_id
-                 , quickCheck prop_compressed_idP
-                 , quickCheck prop_encdec
-                 ]
+runQC = sequence_ [ quickCheck prop_compressed_id
+                  , quickCheck prop_compressed_idP
+                  , quickCheck prop_encdec
+                  ]
+
+main = do
+  putStrLn "Running QuickCheck tests..."
+  runQC
+  putStrLn "Testing serialization"
+  let vv = orderedListToWeft [(1, 11), (3, 33), (4, 44), (10, 1000)] :: WeftVec
+  print $ encode vv

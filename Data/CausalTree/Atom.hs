@@ -8,14 +8,14 @@ import qualified Data.Vector.Unboxed as V
 import Data.Binary
 import Data.CausalTree.SerDes (getP32, putP32)
 
-import Test.QuickCheck
-
 --------------------------
 -- High-level abstractions
 --------------------------
 
--- | An atom id consists of a (yarn, offset) pair.
-type AtomId = (Word32, Word32)
+-- An atom id consists of a (yarn, offset) pair.
+type Yarn   = Word32
+type Offset = Word32
+type AtomId = (Yarn, Offset)
 
 -- | An atom in a causal tree.
 class Atom a where
@@ -80,13 +80,3 @@ taStart = TextAtom (0, 1) (0, 1) '\xE000'
 -- | Construct an end 'TextAtom'
 taEnd :: TextAtom
 taEnd = TextAtom (0, 2) (0, 1) '\xE001'
-
-
-------------------------
--- QuickCheck properties
-------------------------
-
-prop_encdec id pred c = decode (encode atom) == atom
-    where atom = TextAtom id pred c
-
-test = mapM_ quickCheck [prop_encdec]

@@ -6,8 +6,6 @@ import Data.Binary.Put
 import Data.Word
 import Data.Bits
 
-import Test.QuickCheck
-
 ------------------------
 -- Serialization helpers
 ------------------------
@@ -35,13 +33,3 @@ putP32 (w1, w2) = putC32 w1 >> putC32 w2
 -- | Get a compressed pair.
 getP32 :: Get (Word32, Word32)
 getP32 = do { w1 <- getC32; w2 <- getC32; return (w1, w2) }
-
-------------------------
--- QuickCheck properties
-------------------------
-
-prop_compressed_id n = runGet getC32 (runPut $ putC32 n) == n
-prop_compressed_idP a b = runGet getP32 (runPut $ putP32 (a,b)) == (a,b)
-
-test = sequence_ [quickCheck prop_compressed_id,
-                  quickCheck prop_compressed_idP]

@@ -6,6 +6,7 @@ import Data.Word
 import Data.Char
 import qualified Data.Vector.Unboxed as V
 import Data.Binary
+import Data.CausalTree.SerDes (getP32, putP32)
 
 import Test.QuickCheck
 
@@ -59,6 +60,10 @@ instance Atom TextAtom where
     isStartAtom = (=='\xE000') . atomChar
     isEndAtom   = (=='\xE001') . atomChar
 
+instance Binary TextAtom where
+    put (TextAtom id pred char) = putP32 id >> putP32 pred >> put char
+    get = do { id <- getP32; pred <- getP32; char <- get; return $ TextAtom id pred char }
+
 -- | Construct a char 'TextAtom'
 taChar :: AtomId -> AtomId -> Char -> TextAtom
 taChar id pred c | c < '\xE000' || c > '\xE003' = TextAtom id pred c
@@ -75,10 +80,6 @@ taStart = TextAtom (0, 1) (0, 1) '\xE000'
 -- | Construct an end 'TextAtom'
 taEnd :: TextAtom
 taEnd = TextAtom (0, 2) (0, 1) '\xE001'
-
-instance Binary TextAtom where
-    put (TextAtom id pred char) = put id >> put pred >> put char
-    get = do { id <- get; pred <- get; char <- get; return $ TextAtom id pred char }
 
 
 ------------------------

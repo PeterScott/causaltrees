@@ -1,10 +1,14 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 module Data.CausalTree.Weft (
-              Weft (emptyWeft
+              Weft ( emptyWeft
                    , getWeft
                    , setWeft
                    , extendWeft
-                   , weftToList)
-
+                   , weftToList
+                   , listToWeft
+                   , weftToOrderedList
+                   , orderedListToWeft
+                   )
             , WeftMap
             , WeftVec
             ) where
@@ -13,7 +17,9 @@ import Data.CausalTree.Atom (Yarn, Offset)
 import qualified Data.Vector.Unboxed as V
 import Data.Vector.Unboxed (Vector, (!?), (!))
 import qualified Data.HashMap.Strict as M
-import Data.List (foldl')
+import Data.List (foldl', sort)
+import Data.Binary
+import Data.CausalTree.SerDes (getP32, putP32, getC32, putC32)
 
 --------------------------
 -- High-level abstractions
@@ -35,11 +41,26 @@ class Weft a where
     extendWeft :: a -> (Yarn, Offset) -> a
     extendWeft w (yarn, offset) = setWeft w (yarn, offset')
         where offset' = max offset (getWeft w yarn)
-    -- | Return an ordered list of (yarn, offset) pairs.
+    -- | Return an unordered list of (yarn, offset) pairs.
     weftToList :: a -> [(Yarn, Offset)]
+    -- | Return an ordered list of (yarn, offset) pairs.
+    weftToOrderedList :: a -> [(Yarn, Offset)]
+    weftToOrderedList = sort . weftToList
     -- | Convert an unordered list of (yarn, offset) pairs into a Weft.
     listToWeft :: [(Yarn, Offset)] -> a
     listToWeft = foldl' setWeft emptyWeft
+    -- | Convert an ordered list of (yarn, offset) pairs into a Weft.
+    orderedListToWeft :: [(Yarn, Offset)] -> a
+    orderedListToWeft = listToWeft
+
+-- Binary format: A 32-bit length, then a sequence of that many (yarn, offset)
+-- pairs. All numbered are sent in SerDes compressed format.
+instance Weft a => Binary a where
+    put weft = putC32 (fromIntegral $ length lst) >> mapM_ putP32 lst
+        where lst = weftToOrderedList weft
+    get = do len <- getC32
+             lst <- sequence $ take (fromIntegral len) $ repeat getP32
+             return $ orderedListToWeft lst
 
 
 -----------------
@@ -59,6 +80,7 @@ instance Weft WeftMap where
                                            Nothing     -> 0
     setWeft (WeftMap m) (yarn, offset) = WeftMap $ M.insert yarn offset m
     weftToList (WeftMap m)             = M.toList m
+    listToWeft                         = WeftMap . M.fromList
 
 
 --------------------
@@ -86,6 +108,8 @@ instance Weft WeftVec where
                                          , V.singleton (yarn, offset)
                                          , V.unsafeDrop i vec ]
     weftToList (WeftVec vec) = V.toList vec
+    weftToOrderedList (WeftVec vec) = V.toList vec
+    orderedListToWeft = WeftVec . V.fromList
 
 
 ----------------

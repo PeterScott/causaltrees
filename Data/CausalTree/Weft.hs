@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 module Data.CausalTree.Weft (
               Weft ( emptyWeft
                    , getWeft
@@ -55,13 +54,14 @@ class Weft a where
 
 -- Binary format: A 32-bit length, then a sequence of that many (yarn, offset)
 -- pairs. All numbered are sent in SerDes compressed format.
-instance Weft a => Binary a where
-    put weft = putC32 (fromIntegral $ length lst) >> mapM_ putP32 lst
-        where lst = weftToOrderedList weft
-    get = do len <- getC32
-             lst <- sequence $ take (fromIntegral len) $ repeat getP32
-             return $ orderedListToWeft lst
+putWeftBinary :: Weft a => a -> Put
+putWeftBinary weft = putC32 (fromIntegral $ length lst) >> mapM_ putP32 lst
+    where lst = weftToOrderedList weft
 
+getWeftBinary :: Weft a => Get a
+getWeftBinary = do len <- getC32
+                   lst <- sequence $ take (fromIntegral len) $ repeat getP32
+                   return $ orderedListToWeft lst
 
 -----------------
 -- Map-based weft
@@ -82,6 +82,9 @@ instance Weft WeftMap where
     weftToList (WeftMap m)             = M.toList m
     listToWeft                         = WeftMap . M.fromList
 
+instance Binary WeftMap where
+    get = getWeftBinary
+    put = putWeftBinary
 
 --------------------
 -- Vector-based weft
@@ -100,7 +103,7 @@ instance Weft WeftVec where
     setWeft (WeftVec vec) (yarn, offset) =
         case bisectRight vec yarn of
           0 -> WeftVec $ V.cons (yarn, offset) vec
-          i -> let (y, o) = vec ! (i-1)
+          i -> let (y, _) = vec ! (i-1)
                in if y == yarn then
                       WeftVec $ vec `V.unsafeUpd` [((i-1), (yarn, offset))]
                   else
@@ -111,6 +114,9 @@ instance Weft WeftVec where
     weftToOrderedList (WeftVec vec) = V.toList vec
     orderedListToWeft = WeftVec . V.fromList
 
+instance Binary WeftVec where
+    get = getWeftBinary
+    put = putWeftBinary
 
 ----------------
 -- Binary search

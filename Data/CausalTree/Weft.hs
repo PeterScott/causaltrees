@@ -100,19 +100,26 @@ instance Weft WeftVec where
           0 -> 0
           i -> let (y, offset) = vec ! (i-1)
                in if y == yarn then offset else 0
-    setWeft (WeftVec vec) (yarn, offset) =
-        case bisectRight vec yarn of
-          0 -> WeftVec $ V.cons (yarn, offset) vec
-          i -> let (y, _) = vec ! (i-1)
-               in if y == yarn then
-                      WeftVec $ vec `V.unsafeUpd` [((i-1), (yarn, offset))]
-                  else
-                      WeftVec $ V.concat [ V.unsafeTake i vec
-                                         , V.singleton (yarn, offset)
-                                         , V.unsafeDrop i vec ]
+    setWeft = insertExtendVecWeft False
+    extendWeft = insertExtendVecWeft True
     weftToList (WeftVec vec) = V.toList vec
     weftToOrderedList (WeftVec vec) = V.toList vec
     orderedListToWeft = WeftVec . V.fromList
+
+-- Helper function for WeftVec instance. Inserts a (yarn, offset) pair into a
+-- WeftVec, either extending any existing extry or replacing it.
+insertExtendVecWeft :: Bool -> WeftVec -> (Yarn, Offset) -> WeftVec
+insertExtendVecWeft extend (WeftVec vec) (yarn, offset) =
+    case bisectRight vec yarn of
+      0 -> WeftVec $ V.cons (yarn, offset) vec
+      i -> let (y, o) = vec ! (i-1)
+               winner = if extend then max o offset else offset
+           in if y == yarn then
+                  WeftVec $ vec `V.unsafeUpd` [((i-1), (yarn, winner))]
+              else
+                  WeftVec $ V.concat [ V.unsafeTake i vec
+                                     , V.singleton (yarn, offset)
+                                     , V.unsafeDrop i vec ]
 
 instance Binary WeftVec where
     get = getWeftBinary

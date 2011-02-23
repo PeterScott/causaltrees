@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, BangPatterns #-}
 module Data.CausalTree.Weft (
               Weft ( emptyWeft
                    , getWeft
@@ -13,9 +13,9 @@ module Data.CausalTree.Weft (
             , WeftVec
             ) where
 
-import Data.CausalTree.Atom (Yarn, Offset)
+import Data.CausalTree.Atom (AtomId, Yarn, Offset)
 import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Generic as GV
+import qualified Data.Vector as BV
 import Data.Vector.Unboxed (Vector, (!?), (!))
 import qualified Data.HashMap.Strict as M
 import Data.List (foldl', sort)
@@ -53,6 +53,9 @@ class Weft a where
     -- | Convert an ordered list of (yarn, offset) pairs into a Weft.
     orderedListToWeft :: [(Yarn, Offset)] -> a
     orderedListToWeft = listToWeft
+    -- | Merge two wefts together into their union.
+    mergeWefts :: a -> a -> a
+    mergeWefts x y = foldl' setWeft x (weftToList y)
 
 -- Binary format: A 32-bit length, then a sequence of that many (yarn, offset)
 -- pairs. All numbered are sent in SerDes compressed format.
@@ -132,19 +135,73 @@ instance Binary WeftVec where
 ----------------
 
 -- | Locate the insertion point for a key in a key-ordered @(key, value)@
--- vector, which lies to the right of any entry with an identical key. Requires
--- that there be no two entries in the vector with the same key. Works for any
--- Vector type.
-bisectRight :: (GV.Vector v (a, b), Ord a) => v (a, b) -> a -> Int
-bisectRight vec key = bs 0 (GV.length vec)
+-- vector, which lies to the right of any entry with an identical $f (key,
+-- value)$. Requires that there be no two entries in the vector with the same
+-- @f@ value.
+bisectRight' :: Ord a => ((Yarn, Offset) -> a) -> Vector (Yarn, Offset) -> a -> Int
+bisectRight' f vec key = bs 0 (V.length vec)
     where bs l r | l > r = l
-                 | otherwise = case (GV.!?) vec m of
-                                 Nothing  -> GV.length vec
+                 | otherwise = case vec !? m of
+                                 Nothing  -> V.length vec
                                  Just mid ->
-                                     case compare (fst mid) key of
+                                     case compare (f mid) key of
                                        GT -> bs l (m-1)
                                        LT -> bs (m+1) r
                                        EQ -> m+1
                      where m = l + ((r - l) `div` 2)
-{-# SPECIALIZE bisectRight :: Vector (Yarn, Offset) -> Yarn -> Int #-}
 
+bisectRight :: Vector (Yarn, Offset) -> Yarn -> Int
+bisectRight = bisectRight' fst
+
+
+--------------------
+-- Memoization dicts
+--------------------
+
+-- | An id-to-weft memoization dict, for only those atoms whose predecessor is
+-- in another yarn. This turns pulling into an O(1) operation. It consists of a
+-- sorted vector of ids, and a parallel vector of their corresponding wefts.
+--
+-- 'WeftMap's are used here, because typically these wefts will share a lot in
+-- common with each other.
+data MemoDict = MemoDict !(Vector AtomId) !(BV.Vector WeftMap)
+  deriving Show                 -- FIXME: remove this Show instance
+
+emptyMemoDict :: MemoDict
+emptyMemoDict = MemoDict V.empty BV.empty
+
+-- | Add (id, weft) pair to the memoization map. Should be called whenever we
+-- insert an atom, if and only if its predecessor is in another yarn. It's safe
+-- to use pulling to determine the weft.
+addToMemoDict :: MemoDict -> AtomId -> WeftMap -> MemoDict
+addToMemoDict (MemoDict avec wvec) atom_id weft = MemoDict avec' wvec'
+    where i = bisectRight' id avec atom_id
+          avec' = V.concat [V.unsafeTake i avec, V.singleton atom_id, V.unsafeDrop i avec]
+          wvec' = BV.concat [BV.unsafeTake i wvec, BV.singleton weft, BV.unsafeDrop i wvec]
+
+-- | Return the awareness weft of a given id, which may optionally have a
+-- predecessor given. This function will work if and only if 'addToMemoDict' has
+-- been called for every atom whose predecessor is in another yarn. Takes O(1)
+-- time.
+pull :: MemoDict -> AtomId -> Maybe AtomId -> WeftMap
+pull md@(MemoDict avec wvec) atom_id maybe_pred = 
+    let w = case bisectRight' id avec atom_id of
+              0 -> emptyWeft `setWeft` atom_id -- No weft found
+              i -> let this_id   = avec `V.unsafeIndex`  (i - 1)
+                       this_weft = wvec `BV.unsafeIndex` (i - 1)
+                   in if this_id == atom_id then -- Id found. Return it.
+                          this_weft
+                      else if (fst this_id) /= (fst atom_id) then -- Different weave.
+                               emptyWeft `setWeft` atom_id
+                           else         -- Same weft, lower offset
+                               this_weft `extendWeft` atom_id
+    in case maybe_pred of
+         Just pred -> mergeWefts w (pull md pred Nothing)
+         Nothing   -> w
+
+-- -- Some test values
+-- ww = (emptyWeft :: WeftMap) `setWeft` (3, 33) `setWeft`
+--       (1, 22) `setWeft` (1, 235) `extendWeft` (1, 1000)
+-- md1 = addToMemoDict emptyMemoDict (3, 33) ww
+-- md2 = addToMemoDict md1 (6, 69) (ww `extendWeft` (6, 69))
+-- md3 = addToMemoDict md2 (5, 55) (ww `extendWeft` (77, 7777) `extendWeft` (5, 55))

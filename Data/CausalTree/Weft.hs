@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Data.CausalTree.Weft (
               Weft ( emptyWeft
                    , getWeft
@@ -14,6 +15,7 @@ module Data.CausalTree.Weft (
 
 import Data.CausalTree.Atom (Yarn, Offset)
 import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Generic as GV
 import Data.Vector.Unboxed (Vector, (!?), (!))
 import qualified Data.HashMap.Strict as M
 import Data.List (foldl', sort)
@@ -129,17 +131,20 @@ instance Binary WeftVec where
 -- Binary search
 ----------------
 
--- | Locate the insertion point for a 'Yarn' in an ordered @(Yarn, Offset)@
--- vector, which lies to the right of any entry with an identical yarn. Requires
--- that there be no two entries in the vector with the same yarn.
-bisectRight :: Vector (Yarn, Offset) -> Yarn -> Int
-bisectRight vec yarn = bs 0 (V.length vec)
+-- | Locate the insertion point for a key in a key-ordered @(key, value)@
+-- vector, which lies to the right of any entry with an identical key. Requires
+-- that there be no two entries in the vector with the same key. Works for any
+-- Vector type.
+bisectRight :: (GV.Vector v (a, b), Ord a) => v (a, b) -> a -> Int
+bisectRight vec key = bs 0 (GV.length vec)
     where bs l r | l > r = l
-                 | otherwise = case vec !? m of
-                                 Nothing  -> V.length vec
+                 | otherwise = case (GV.!?) vec m of
+                                 Nothing  -> GV.length vec
                                  Just mid ->
-                                     case compare (fst mid) yarn of
+                                     case compare (fst mid) key of
                                        GT -> bs l (m-1)
                                        LT -> bs (m+1) r
                                        EQ -> m+1
                      where m = l + ((r - l) `div` 2)
+{-# SPECIALIZE bisectRight :: Vector (Yarn, Offset) -> Yarn -> Int #-}
+

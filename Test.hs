@@ -4,6 +4,7 @@ import Data.CausalTree.SerDes
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
+import qualified Data.Vector.Storable as SV
 
 import Test.QuickCheck
 
@@ -19,10 +20,15 @@ prop_compressed_idP a b = runGet getP32 (runPut $ putP32 (a,b)) == (a,b)
 prop_encdec id pred c = decode (encode atom) == atom
     where atom = TextAtom id pred c
 
+prop_storable id pred c = SV.head vec == atom
+    where atom = TextAtom id pred c
+          vec  = SV.singleton atom
+
 -- Top level
 runQC = sequence_ [ quickCheck prop_compressed_id
                   , quickCheck prop_compressed_idP
                   , quickCheck prop_encdec
+                  , quickCheck prop_storable
                   ]
 
 main = do

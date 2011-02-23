@@ -8,9 +8,15 @@ module Data.CausalTree.Weft (
                    , listToWeft
                    , weftToOrderedList
                    , orderedListToWeft
+                   , mergeWefts
+                   , underWeft
                    )
             , WeftMap
             , WeftVec
+            , MemoDict
+            , emptyMemoDict
+            , addToMemoDict
+            , pull
             ) where
 
 import Data.CausalTree.Atom (AtomId, Yarn, Offset)
@@ -35,7 +41,7 @@ class Weft a where
     getWeft :: a -> Yarn -> Offset
     -- | Set the offset of the given yarn to the value you specify. Note that if
     -- the value is smaller than the current offset, the current offset will be
-    -- replaced. If you don't want this behavior, use extendWeft.
+    -- replaced. If you don't want this behavior, use 'extendWeft'.
     setWeft :: a -> (Yarn, Offset) -> a
     -- | Set the offset of the given yarn to the value you specify or the
     -- existing value, whichever is larger.
@@ -47,15 +53,18 @@ class Weft a where
     -- | Return an ordered list of (yarn, offset) pairs.
     weftToOrderedList :: a -> [(Yarn, Offset)]
     weftToOrderedList = sort . weftToList
-    -- | Convert an unordered list of (yarn, offset) pairs into a Weft.
+    -- | Convert an unordered list of (yarn, offset) pairs into a 'Weft'.
     listToWeft :: [(Yarn, Offset)] -> a
     listToWeft = foldl' setWeft emptyWeft
-    -- | Convert an ordered list of (yarn, offset) pairs into a Weft.
+    -- | Convert an ordered list of (yarn, offset) pairs into a 'Weft'.
     orderedListToWeft :: [(Yarn, Offset)] -> a
     orderedListToWeft = listToWeft
-    -- | Merge two wefts together into their union.
+    -- | Merge two 'Weft's together into their union.
     mergeWefts :: a -> a -> a
     mergeWefts x y = foldl' setWeft x (weftToList y)
+    -- | Is an 'AtomId' beneath the 'Weft'?
+    underWeft :: AtomId -> a -> Bool
+    underWeft (yarn, offset) w = offset <= (w `getWeft` yarn)
 
 -- Binary format: A 32-bit length, then a sequence of that many (yarn, offset)
 -- pairs. All numbered are sent in SerDes compressed format.

@@ -92,14 +92,14 @@ patchValid (Patch chains) = fst $ BV.foldl' ((trace .) . checkChain) (True, firs
           first_atom_id = atomId $ V.head $ snd $ BV.head chains
           low_offset  = snd $ first_atom_id
           high_offset = snd $ atomId $ V.last $ snd $ BV.last chains
-          -- in sequence, starting w/ given id, from same user
+          -- in sequence, starting with given id, from same user
           inSeq (yarn, off0) atoms = fst $ V.foldl' iter (True, off0) atoms
               where iter (False, o) _ = (False, o)
                     iter (True, offset) atom =
                         let (y, o) = atomId atom
                             good   = y == yarn && o == offset
                         in (good, o+1)
-          -- in sequence, starting w/ given id, from same user, with all but
+          -- in sequence, starting with given id, from same user, with all but
           -- first having the previous as its predecessor.
           inSeqPred (yarn, off0) atoms = f3 $ V.foldl' iter (True, off0, atomPred (V.head atoms)) atoms
               where iter (False, o, p) _ = (False, o, p)

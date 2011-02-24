@@ -54,9 +54,12 @@ isDeletor       = (=='\xE002') . atomChar
 -- | Is a 'TextAtom' a save-awareness atom?
 isSaveAwareness :: TextAtom -> Bool
 isSaveAwareness = (=='\xE003') . atomChar
+-- | Is a 'TextAtom' visible?
+isVisible :: TextAtom -> Bool
+isVisible (TextAtom _ _ c) = c < '\xE000' || c > '\xE003'
 
 instance Atom TextAtom where
-    isSticky (TextAtom _ _ c) = c >= '\xE000' && c <= '\xE003'
+    isSticky (TextAtom _ _ c) = c == '\xE002' || c == '\xE003' -- deletors and savers
     atomId (TextAtom id _ _) = id
     atomPred (TextAtom _ pred _) = pred
     isStartAtom = (=='\xE000') . atomChar

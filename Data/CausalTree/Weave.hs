@@ -11,11 +11,6 @@ import Foreign.Storable
 import Data.Binary
 import Data.List (nub, null)
 
-import System.IO.Unsafe
-
-trace :: Show a => a -> a
-trace x = unsafePerformIO (print x) `seq` x
-
 --------------------------
 -- High-level abstractions
 --------------------------
@@ -52,16 +47,16 @@ newtype Patch = Patch (BV.Vector (Bool, Vector TextAtom))
 -- Patch operations
 -------------------
 
-chain1 = (False, V.fromList [taChar (1, 1) (0, 1) 'H', taChar (1, 2) (1, 1) 'e', 
-                             taChar (1, 3) (1, 2) 'y'])
-chain2 = (True,  V.fromList [taDeletor (1, 4) (5, 55), taDeletor (1, 5) (4, 44)])
-chain3 = (False, V.fromList [taChar (1, 6) (7, 11) 'S', taChar (1, 7) (1, 6) 'u', 
-                             taChar (1, 8) (1, 7) 'p'])
-testPatch = Patch $ BV.fromList [chain1, chain2, chain3]
-tp1 = Patch $ BV.singleton chain1
+-- chain1 = (False, V.fromList [taChar (1, 1) (0, 1) 'H', taChar (1, 2) (1, 1) 'e', 
+--                              taChar (1, 3) (1, 2) 'y'])
+-- chain2 = (True,  V.fromList [taDeletor (1, 4) (5, 55), taDeletor (1, 5) (4, 44)])
+-- chain3 = (False, V.fromList [taChar (1, 6) (7, 11) 'S', taChar (1, 7) (1, 6) 'u', 
+--                              taChar (1, 8) (1, 7) 'p'])
+-- testPatch = Patch $ BV.fromList [chain1, chain2, chain3]
+-- tp1 = Patch $ BV.singleton chain1
 
-weave1 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 57), (5, 100), (7, 15)] } -- ready
-weave2 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 41), (5, 100), (7, 10)] } -- block
+-- weave1 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 57), (5, 100), (7, 15)] } -- ready
+-- weave2 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 41), (5, 100), (7, 10)] } -- block
 
 -- | Is a 'Patch' ready to be applied to a 'Weave'?
 patchReady :: Weave w => Patch -> w -> Bool
@@ -114,9 +109,6 @@ patchValid (Patch chains) = fst $ BV.foldl' ((trace .) . checkChain) (True, firs
                         in (good, o+1, atomId atom)
                     f3 (x, _, _) = x
 
---X checkChain :: (Bool, AtomId) -> Chain -> (Bool, AtomId)
-
--- FIXME: make patch validator
 
 -----------------------
 -- Simple vector weaves

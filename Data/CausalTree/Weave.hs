@@ -9,7 +9,13 @@ import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector, (!?), (!))
 import Foreign.Storable
 import Data.Binary
-import Data.List (nub, null)
+import Data.List (nub, null, foldl')
+
+import qualified Data.ByteString.Lazy as L
+import Data.ByteString.Lazy (ByteString)
+import qualified Blaze.ByteString.Builder as BB
+import qualified Blaze.ByteString.Builder.Char.Utf8 as BB
+import Data.Monoid
 
 --------------------------
 -- High-level abstractions
@@ -18,12 +24,14 @@ import Data.List (nub, null)
 class Weave w where
     -- | Return an empty 'Weave'
     emptyWeave      :: w
-    -- | Weft covering all atoms in 'wvVec'
+    -- | Weft covering all atoms in 'vwVec'
     weaveWeft       :: w -> WeftVec
     -- | Id-to-weft memoization dict
     weaveMemoDict   :: w -> MemoDict
     -- | Waiting set. A map of ids to patches blocking on them.
     weaveWaitingSet :: w -> M.HashMap AtomId Patch
+    -- | Scour a weave, producing a lazy 'ByteString'.
+--    scour           :: w -> ByteString
 
 -- | A patch consists of a vector of chains. All of the chains must be inserted
 -- atomically. Each chain must be either sticky or non-sticky (as indicated by
@@ -55,8 +63,8 @@ newtype Patch = Patch (BV.Vector (Bool, Vector TextAtom))
 -- testPatch = Patch $ BV.fromList [chain1, chain2, chain3]
 -- tp1 = Patch $ BV.singleton chain1
 
--- weave1 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 57), (5, 100), (7, 15)] } -- ready
--- weave2 = emptyWeave { wvWeft = orderedListToWeft [(0, 2), (4, 41), (5, 100), (7, 10)] } -- block
+-- weave1 = emptyWeave { vwWeft = orderedListToWeft [(0, 2), (4, 57), (5, 100), (7, 15)] } -- ready
+-- weave2 = emptyWeave { vwWeft = orderedListToWeft [(0, 2), (4, 41), (5, 100), (7, 10)] } -- block
 
 -- | Is a 'Patch' ready to be applied to a 'Weave'?
 patchReady :: Weave w => Patch -> w -> Bool
@@ -119,22 +127,58 @@ patchValid (Patch chains) = fst $ BV.foldl' checkChain (True, first_atom_id) cha
 data VectorWeave = 
     VectorWeave {
       -- | Unboxed 'Vector' of storable 'Atom's
-      wvVec        :: Vector TextAtom,
+      vwVec        :: Vector TextAtom,
       -- | Weft covering all atoms in 'wvVec'
-      wvWeft       :: WeftVec,
+      vwWeft       :: WeftVec,
       -- | Id-to-weft memoization dict
-      wvMemoDict   :: MemoDict,
+      vwMemoDict   :: MemoDict,
       -- | Waiting set. A map of ids to patches blocking on them.
-      wvWaitingSet :: M.HashMap AtomId Patch
+      vwWaitingSet :: M.HashMap AtomId Patch
     }
   deriving Show
 
 instance Weave VectorWeave where
     -- Empty weave: has start and end atoms, and weft covering them.
-    emptyWeave = VectorWeave { wvVec = V.fromList [taStart, taEnd]
-                             , wvWeft = orderedListToWeft [(0, 2)]
-                             , wvMemoDict = emptyMemoDict
-                             , wvWaitingSet = M.empty }
-    weaveWeft       = wvWeft
-    weaveMemoDict   = wvMemoDict
-    weaveWaitingSet = wvWaitingSet
+    emptyWeave = VectorWeave { vwVec = V.fromList [taStart, taEnd]
+                             , vwWeft = orderedListToWeft [(0, 2)]
+                             , vwMemoDict = emptyMemoDict
+                             , vwWaitingSet = M.empty }
+    weaveWeft       = vwWeft
+    weaveMemoDict   = vwMemoDict
+    weaveWaitingSet = vwWaitingSet
+
+-- FIXME: IMPORTANT: when inserting save-awarenesses, insert after the end atom!
+
+vwScour :: VectorWeave -> ByteString
+vwScour = BB.toLazyByteString . vscour . vwVec
+    where vscour vec = V.ifoldr scourPos mempty vec
+              where scourPos i atom tl =
+                        if isVisible atom && not (isDeletor (vec ! (i+1))) then
+                            BB.fromChar (atomChar atom) `mappend` tl
+                        else tl
+
+-- $0101 T01a1 ea1a2 xa2b2 sa2a3 ^a3b1 ta3a4 #0102 *b2a5
+cw = emptyWeave { vwVec = V.fromList v }
+    where v = [ taStart 
+              , taChar (1,1) (0,1) 'T'
+              , taChar (1,2) (1,1) 'e'
+              , taChar (2,2) (1,2) 'x'
+              , taChar (1,3) (1,2) 's'
+              , taDeletor (2,1) (1,3)
+              , taChar (1,4) (1,3) 't'
+              , taEnd
+              , taSaveAwareness (1,5) (2,2)
+              ]
+
+-- $0101 T01a1 ea1a2 xa2b2 sa2a3 ^a3b1 ta3a4 #0102 *b2a5, with memo dict and weft.
+cw_test = emptyWeave { vwVec = V.fromList v
+                     , vwWeft = listToWeft [(0, 2), (1, 4)]
+                     , vwMemoDict = memoDict }
+    where v = [ taStart 
+              , taChar (1,1) (0,1) 'T'
+              , taChar (1,2) (1,1) 'e'
+              , taChar (1,3) (1,2) 's'
+              , taChar (1,4) (1,3) 't'
+              , taEnd
+              ]
+          memoDict = addToMemoDict emptyMemoDict (1,1) (orderedListToWeft [(0, 2)])

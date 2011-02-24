@@ -17,5 +17,6 @@ Library
   Exposed-modules:   Data.CausalTree,
                      Data.CausalTree.Atom,
                      Data.CausalTree.Weft,
-                     Data.CausalTree.SerDes
+                     Data.CausalTree.SerDes,
+                     Data.CausalTree.Weave
   ghc-options:       -Wall -Odph -O2 -fno-warn-name-shadowing

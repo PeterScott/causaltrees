@@ -79,7 +79,7 @@ patchAnchors (Patch chains) = nub $ concat $ BV.toList $ BV.map chainAnchors cha
 -- | Is a 'Patch' valid? All 'Patch'es coming from untrusted sources must be
 -- checked with this function to ensure safety.
 patchValid :: Patch -> Bool
-patchValid (Patch chains) = fst $ BV.foldl' ((trace .) . checkChain) (True, first_atom_id) chains
+patchValid (Patch chains) = fst $ BV.foldl' checkChain (True, first_atom_id) chains
     where checkChain :: (Bool, AtomId) -> (Bool, Vector TextAtom) -> (Bool, AtomId)
           checkChain (False, id) _ = (False, id)
           checkChain (True, start_id) (True, atoms)  = -- Sticky chain
